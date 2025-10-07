@@ -1,169 +1,176 @@
-import React, { useEffect, useMemo, useRef, useState } from "react";
-
-// ===== 사자성어 데이터 (간략화 버전) =====
-const IDIOMS = [
-  { id: 1, term: "절차탁마(切磋琢磨)", meaning: "서로 배우며 갈고닦아 향상함.", origin: "시경/예기", tags: ["수양","공부"] },
-  { id: 2, term: "형설지공(螢雪之功)", meaning: "고생하며 학문을 이루는 공.", origin: "진서/수경주", tags: ["근면","공부"] },
-  { id: 3, term: "근묵자흑(近墨者黑)", meaning: "먹을 가까이하면 검어진다(환경의 영향).", origin: "태자소부", tags: ["자기관리"] },
-  { id: 4, term: "대기만성(大器晩成)", meaning: "큰 그릇은 늦게 이루어짐.", origin: "노자", tags: ["인내","성장"] },
-  { id: 5, term: "백절불굴(百折不屈)", meaning: "백 번 꺾여도 굽히지 않음.", origin: "후한서", tags: ["의지","인내"] },
-  { id: 6, term: "온고지신(溫故知新)", meaning: "옛것을 익혀 새것을 안다.", origin: "논어", tags: ["학습"] },
-  { id: 7, term: "유지경성(有志竟成)", meaning: "뜻이 있으면 마침내 이룸.", origin: "후한서", tags: ["의지"] },
-  { id: 8, term: "청출어람(靑出於藍)", meaning: "제자가 스승보다 더 나음.", origin: "순자", tags: ["성장"] },
-  { id: 9, term: "초지일관(初志一貫)", meaning: "처음 세운 뜻을 끝까지 밀고 나감.", origin: "후한서", tags: ["의지"] },
-  { id: 10, term: "사필귀정(事必歸正)", meaning: "모든 일은 결국 바른 데로 돌아감.", origin: "역사서 통용", tags: ["정의"] },
-];
-
-const shuffle = (arr) => {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-};
-
-export default function App() {
-  const [query, setQuery] = useState("");
-  const [order, setOrder] = useState(() => shuffle(IDIOMS.map((x) => x.id)));
-  const [idx, setIdx] = useState(0);
-  const [back, setBack] = useState(false);
-  const [soundOn, setSoundOn] = useState(true);
-  const audioCtxRef = useRef(null);
-
-  const filtered = useMemo(() => {
-    const q = query.trim();
-    const all = order.map((id) => IDIOMS.find((x) => x.id === id));
-    return all.filter((i) => {
-      if (!q) return true;
-      const hay = `${i.term} ${i.meaning} ${i.origin}`;
-      return hay.toLowerCase().includes(q.toLowerCase());
-    });
-  }, [order, query]);
-
-  const cur = filtered[idx % Math.max(filtered.length, 1)] || IDIOMS[0];
-
-  const playFlip = () => {
-    if (!soundOn) return;
-    try {
-      const ctx = audioCtxRef.current || new (window.AudioContext || window.webkitAudioContext)();
-      audioCtxRef.current = ctx;
-      const now = ctx.currentTime;
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      osc.type = "triangle";
-      osc.frequency.setValueAtTime(300, now);
-      osc.frequency.exponentialRampToValueAtTime(800, now + 0.15);
-      gain.gain.setValueAtTime(0.2, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.15);
-      osc.connect(gain).connect(ctx.destination);
-      osc.start(now);
-      osc.stop(now + 0.15);
-    } catch (e) {}
-  };
-
-  const nextCard = () => { setBack(false); setIdx((v) => (v + 1) % filtered.length); };
-  const prevCard = () => { setBack(false); setIdx((v) => (v - 1 + filtered.length) % filtered.length); };
-  const reshuffle = () => { setOrder(shuffle(IDIOMS.map((x) => x.id))); setIdx(0); setBack(false); };
-
-  return (
-    <div style={styles.page}>
-      <h1 style={styles.title}>🀄 호마맨 사자성어</h1>
-      <div style={styles.toolbar}>
-        <input
-          placeholder="검색(용어/뜻/유래)"
-          value={query}
-          onChange={(e) => { setQuery(e.target.value); setIdx(0); }}
-          style={styles.input}
-        />
-        <button onClick={reshuffle} style={styles.btn}>🔀 셔플</button>
-        <button onClick={() => { setBack(!back); playFlip(); }} style={styles.btn}>↩️ 뒤집기</button>
-        <label style={styles.inlineLabel}>
-          <input type="checkbox" checked={soundOn} onChange={(e) => setSoundOn(e.target.checked)} /> 사운드
-        </label>
-      </div>
-
-      <div style={styles.cardWrap}>
-        <button onClick={prevCard} style={styles.navBtn}>◀</button>
-
-        <FlipCard back={back} onClick={() => { setBack(!back); playFlip(); }}>
-          <CardFront term={cur.term} />
-          <CardBack meaning={cur.meaning} origin={cur.origin} />
-        </FlipCard>
-
-        <button onClick={nextCard} style={styles.navBtn}>▶</button>
-      </div>
-
-      <div style={styles.meta}>카드 {idx + 1}/{filtered.length}</div>
-      <style>{css}</style>
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>호마맨 사자성어</title>
+    <style>
+      body {
+        font-family: Pretendard, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        background: #faf7ef;
+        margin: 0;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      h1 {
+        font-size: 32px;
+        font-weight: 800;
+        margin-bottom: 12px;
+      }
+      input, button {
+        border-radius: 10px;
+        border: 1px solid #6b6658;
+        padding: 10px 14px;
+        background: #fcfaf3;
+      }
+      .toolbar {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+        margin-bottom: 12px;
+        justify-content: center;
+      }
+      .scene {
+        width: 90%;
+        max-width: 600px;
+        height: 280px;
+        perspective: 1000px;
+      }
+      .card {
+        width: 100%;
+        height: 100%;
+        position: relative;
+        transition: transform 0.6s;
+        transform-style: preserve-3d;
+        border-radius: 22px;
+        box-shadow: 0 12px 28px rgba(0, 0, 0, 0.08), 0 6px 14px rgba(0, 0, 0, 0.05);
+        border: 1px solid #cdbfa6;
+      }
+      .card.is-flipped {
+        transform: rotateY(180deg);
+      }
+      .card__face {
+        position: absolute;
+        inset: 0;
+        backface-visibility: hidden;
+        border-radius: 22px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        background-color: #fffaf1;
+        background-image: radial-gradient(rgba(0, 0, 0, 0.03) 0.6px, rgba(0, 0, 0, 0) 0.6px),
+          radial-gradient(rgba(0, 0, 0, 0.025) 0.8px, rgba(0, 0, 0, 0) 0.8px),
+          repeating-linear-gradient(25deg, rgba(136, 112, 88, 0.06) 0 2px, rgba(136, 112, 88, 0.02) 2px 6px),
+          repeating-linear-gradient(-18deg, rgba(136, 112, 88, 0.05) 0 3px, rgba(136, 112, 88, 0.02) 3px 7px);
+        background-size: 6px 6px, 11px 11px, 100% 100%, 100% 100%;
+        text-align: center;
+        padding: 20px;
+      }
+      .card__face--back {
+        transform: rotateY(180deg);
+      }
+      .navs {
+        display: flex;
+        justify-content: space-between;
+        width: 200px;
+        margin: 10px 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>🀄 호마맨 사자성어</h1>
+    <div class="toolbar">
+      <input id="search" placeholder="검색(용어/뜻/유래)" />
+      <button id="shuffle">🔀 셔플</button>
+      <button id="flip">↩️ 뒤집기</button>
+      <label><input type="checkbox" id="soundToggle" checked /> 사운드</label>
     </div>
-  );
-}
 
-function CardFront({ term }) {
-  return (
-    <div style={styles.cardFace}>
-      <div style={{ fontSize: 40, fontWeight: 800 }}>{term}</div>
-      <div style={{ marginTop: 12, fontSize: 16, opacity: 0.6 }}>카드를 클릭하거나 뒤집기 버튼을 눌러 뜻 보기</div>
-    </div>
-  );
-}
-
-function CardBack({ meaning, origin }) {
-  return (
-    <div style={styles.cardFace}>
-      <div style={{ fontSize: 22, fontWeight: 700 }}>{meaning}</div>
-      <div style={{ marginTop: 10, fontSize: 15, opacity: 0.7 }}>유래: {origin}</div>
-    </div>
-  );
-}
-
-function FlipCard({ back, onClick, children }) {
-  return (
-    <div style={styles.scene} onClick={onClick}>
-      <div className={back ? "card is-flipped" : "card"}>
-        <div className="card__face card__face--front">{children[0]}</div>
-        <div className="card__face card__face--back">{children[1]}</div>
+    <div class="scene" id="scene">
+      <div class="card" id="card">
+        <div class="card__face card__face--front" id="front"></div>
+        <div class="card__face card__face--back" id="back"></div>
       </div>
     </div>
-  );
-}
 
-const styles = {
-  page: { fontFamily: "Pretendard, system-ui, -apple-system, Segoe UI, Roboto, sans-serif", maxWidth: 920, margin: "32px auto", padding: "0 16px", background: "#faf7ef" },
-  title: { fontSize: 32, fontWeight: 800, marginBottom: 12 },
-  toolbar: { display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", marginBottom: 12 },
-  input: { flex: 1, minWidth: 220, padding: "10px 12px", borderRadius: 10, border: "1px solid #cbbfa8", background: "#fffdf7" },
-  btn: { padding: "10px 14px", borderRadius: 10, border: "1px solid #6b6658", background: "#fcfaf3", cursor: "pointer" },
-  inlineLabel: { display: "flex", alignItems: "center", gap: 6, fontSize: 14, opacity: 0.85 },
-  cardWrap: { display: "grid", gridTemplateColumns: "60px 1fr 60px", gap: 12, alignItems: "center", margin: "16px 0" },
-  navBtn: { width: 50, height: 50, borderRadius: 14, border: "1px solid #6b6658", background: "#fcfaf3", cursor: "pointer", fontSize: 20 },
-  scene: { width: "100%", maxWidth: 600, height: 280, perspective: 1000, margin: "0 auto" },
-  cardFace: { display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: "100%", padding: 20, textAlign: "center" },
-  meta: { marginTop: 8, fontSize: 14, opacity: 0.7 },
-};
+    <div class="navs">
+      <button id="prev">◀</button>
+      <button id="next">▶</button>
+    </div>
+    <div id="meta"></div>
 
-const css = `
-.card {
-  width: 100%;
-  height: 100%;
-  position: relative;
-  transition: transform 0.6s;
-  transform-style: preserve-3d;
-  border-radius: 22px;
-  box-shadow: 0 12px 28px rgba(0,0,0,0.08), 0 6px 14px rgba(0,0,0,0.05);
-  border: 1px solid #cdbfa6;
-}
-.card.is-flipped { transform: rotateY(180deg); }
-.card__face {
-  position: absolute; inset: 0; backface-visibility: hidden; border-radius: 22px;
-  background-color: #fffaf1;
-  background-image:
-    radial-gradient(rgba(0,0,0,0.03) 0.6px, rgba(0,0,0,0) 0.6px),
-    radial-gradient(rgba(0,0,0,0.025) 0.8px, rgba(0,0,0,0) 0.8px),
-    repeating-linear-gradient(25deg, rgba(136,112,88,0.06) 0 2px, rgba(136,112,88,0.02) 2px 6px),
-    repeating-linear-gradient(-18deg, rgba(136,112,88,0.05) 0 3px, rgba(136,112,88,0.02) 3px 7px);
-  background-size: 6px 6px, 11px 11px, 100% 100%, 100% 100%;
-}
-.card__face--back { transform: rotateY(180deg); }
-`;
+    <script>
+      const idioms = [
+        { term: "절차탁마(切磋琢磨)", meaning: "서로 배우며 갈고닦아 향상함.", origin: "시경/예기" },
+        { term: "형설지공(螢雪之功)", meaning: "고생하며 학문을 이루는 공.", origin: "진서/수경주" },
+        { term: "근묵자흑(近墨者黑)", meaning: "먹을 가까이하면 검어진다.", origin: "태자소부" },
+        { term: "대기만성(大器晩成)", meaning: "큰 그릇은 늦게 이루어짐.", origin: "노자" },
+        { term: "백절불굴(百折不屈)", meaning: "백 번 꺾여도 굽히지 않음.", origin: "후한서" },
+        { term: "온고지신(溫故知新)", meaning: "옛것을 익혀 새것을 안다.", origin: "논어" },
+        { term: "유지경성(有志竟成)", meaning: "뜻이 있으면 마침내 이룸.", origin: "후한서" },
+        { term: "청출어람(靑出於藍)", meaning: "제자가 스승보다 더 나음.", origin: "순자" },
+        { term: "초지일관(初志一貫)", meaning: "처음 세운 뜻을 끝까지 밀고 나감.", origin: "후한서" },
+        { term: "사필귀정(事必歸正)", meaning: "모든 일은 결국 바른 데로 돌아감.", origin: "역사서 통용" }
+      ];
+
+      let order = shuffle([...Array(idioms.length).keys()]);
+      let idx = 0;
+      let backShown = false;
+
+      const card = document.getElementById('card');
+      const front = document.getElementById('front');
+      const back = document.getElementById('back');
+      const meta = document.getElementById('meta');
+
+      const soundToggle = document.getElementById('soundToggle');
+
+      function shuffle(arr){
+        for(let i=arr.length-1;i>0;i--){
+          const j=Math.floor(Math.random()*(i+1));
+          [arr[i],arr[j]]=[arr[j],arr[i]];
+        }
+        return arr;
+      }
+
+      function showCard(){
+        const cur=idioms[order[idx]];
+        front.innerHTML=`<div style='font-size:40px;font-weight:800;'>${cur.term}</div><div style='margin-top:12px;font-size:16px;opacity:0.6;'>카드를 클릭하거나 뒤집기 버튼을 눌러 뜻 보기</div>`;
+        back.innerHTML=`<div style='font-size:22px;font-weight:700;'>${cur.meaning}</div><div style='margin-top:10px;font-size:15px;opacity:0.7;'>유래: ${cur.origin}</div>`;
+        meta.innerText=`카드 ${idx+1}/${idioms.length}`;
+      }
+
+      function flipCard(){
+        card.classList.toggle('is-flipped');
+        playSound();
+        backShown=!backShown;
+      }
+
+      function playSound(){
+        if(!soundToggle.checked) return;
+        const ctx=new (window.AudioContext||window.webkitAudioContext)();
+        const osc=ctx.createOscillator();
+        const gain=ctx.createGain();
+        osc.type='triangle';
+        const now=ctx.currentTime;
+        osc.frequency.setValueAtTime(300,now);
+        osc.frequency.exponentialRampToValueAtTime(800,now+0.15);
+        gain.gain.setValueAtTime(0.2,now);
+        gain.gain.exponentialRampToValueAtTime(0.001,now+0.15);
+        osc.connect(gain).connect(ctx.destination);
+        osc.start(now);
+        osc.stop(now+0.15);
+      }
+
+      document.getElementById('flip').onclick=flipCard;
+      document.getElementById('next').onclick=()=>{backShown=false;card.classList.remove('is-flipped');idx=(idx+1)%idioms.length;showCard();};
+      document.getElementById('prev').onclick=()=>{backShown=false;card.classList.remove('is-flipped');idx=(idx-1+idioms.length)%idioms.length;showCard();};
+      document.getElementById('shuffle').onclick=()=>{order=shuffle(order);idx=0;backShown=false;card.classList.remove('is-flipped');showCard();};
+      card.onclick=flipCard;
+
+      showCard();
+    </script>
+  </body>
+</html>
